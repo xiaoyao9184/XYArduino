@@ -9,7 +9,7 @@
  * BSD license, all text above must be included in any redistribution
  *
  ****************************************************/
- 
+
 /*
 This example code is used to connect the Lewei cloud service (Official homepage: www.lewei50.com).
 
@@ -123,7 +123,6 @@ char* nameAnalogPins[] = {
   ,"AMBIENT_LIGHT"  //5
 };
 char* nameDigitalPins[] = {
-
   ""   //0GREEN_LED
   ,""  //1WHITE_LED
   ,""  //2BLUE_LED
@@ -186,7 +185,7 @@ void readAllDigital(int* digitalPins, int pinCount, float *result){
 
     *result = value || *result;
     Serial.print(F("\t"));
-    Serial.println(*result);
+    Serial.println(*result,0);
 
     digitalPins++;
     result++;
@@ -279,7 +278,7 @@ void createJsonComplex(char* namePins[], int pinCount, float* valuePins, char *h
   Serial.print(F("Flag Count "));
   Serial.println(pinCount);
   int index = 0;
-  int values;
+  int values = 0;
   char names[pinCount] = {};
 
   for (int thisPin = 0; thisPin < pinCount; thisPin++) {
@@ -291,7 +290,7 @@ void createJsonComplex(char* namePins[], int pinCount, float* valuePins, char *h
     names[index] = flagName;
     byte flagValue = byte(*valuePins);
     byte flagPart = (flagValue << index);
-    values = values + flagPart;
+    values = values + int(flagPart);
 
     Serial.print(F("\tPin "));
     Serial.print(thisPin);

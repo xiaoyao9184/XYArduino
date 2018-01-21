@@ -1,20 +1,20 @@
-/*************************************************** 
+/***************************************************
  * This is an example for the DFRobot Wido - Wifi Integrated IoT lite sensor and control node
  * Product Page & More info: http://www.dfrobot.com.cn/goods-997.html
  * Designed specifically to work with the DFRobot Wido products:
- * 
+ *
  * The library is forked from Adafruit
  * Modified by Cain
- * Base on the yeelink version written by Lauren 
+ * Base on the yeelink version written by Lauren
  * BSD license, all text above must be included in any redistribution
- * 
+ *
  ****************************************************/
  
 /*
 This example code is used to connect the Lewei cloud service (Official homepage: www.lewei50.com).
 
  The device required is just:
- 
+
  1. any device you used to upload data
  2. And Wido
 
@@ -103,13 +103,13 @@ SPI_CLOCK_DIVIDER); // you can change this clock speed
 #define DIGITAL_COUNT 17
 
 //HTTP body buffer lenght
-#define BODY_BUF_LEN 450
+#define BODY_BUF_LEN 350
 
-/* 
- *  External configuration file, 
- *  containing only personal information, 
+/*
+ *  External configuration file,
+ *  containing only personal information,
  *  can be deleted directly
- *  
+ *
  *  外部配置文件，仅仅包含个人私有信息，直接删除即可
  */
 #include "config.h"
@@ -142,8 +142,8 @@ char* nameDigitalPins[] = {
   ,""  //15Wido_SPI_SCK
   ,""  //16Wido_SPI_MOSI
 };
-long valueAnalogPins[ANALOG_COUNT] = {};
-long valueDigitalPins[DIGITAL_COUNT] = {};
+float valueAnalogPins[ANALOG_COUNT] = {};
+float valueDigitalPins[DIGITAL_COUNT] = {};
 int valueCount;
 int indexOutDigitalPins[] = {
   GREEN_LED, WHITE_LED, BLUE_LED, RED_LED
@@ -168,7 +168,7 @@ void modelDigital(int* digitalPins, int pinCount, int mode){
   }
   Serial.println(F(""));
 }
-void readAllDigital(int* digitalPins, int pinCount, long *result){
+void readAllDigital(int* digitalPins, int pinCount, float *result){
   Serial.print(F("\tIndex"));
   Serial.print(F("\tnew || "));
   Serial.print(F("\told"));
@@ -176,23 +176,23 @@ void readAllDigital(int* digitalPins, int pinCount, long *result){
   for (int thisPin = 0; thisPin < pinCount; thisPin++) {
     int index = *digitalPins;
     int value = digitalRead(index);
-    
+
     Serial.print(F("\t"));
     Serial.print(index);
     Serial.print(F("\t"));
     Serial.print(value);
     Serial.print(F("\t"));
-    Serial.print(*result);
+    Serial.print(*result,0);
 
     *result = value || *result;
     Serial.print(F("\t"));
     Serial.println(*result);
-    
+
     digitalPins++;
     result++;
   }
 }
-void readAllAnalog(int* analogPins, int pinCount, long *result){
+void readAllAnalog(int* analogPins, int pinCount, float *result){
   Serial.print(F("\tIndex"));
   Serial.print(F("\tvalue"));
   Serial.print(F("\tsum / "));
@@ -201,9 +201,9 @@ void readAllAnalog(int* analogPins, int pinCount, long *result){
   for (int thisPin = 0; thisPin < pinCount; thisPin++) {
     int index = *analogPins;
     int value = analogRead(index);
-    int sum = (*result * valueCount);
+    float sum = (*result * valueCount);
     sum = sum + value;
-    
+
     Serial.print(F("\t"));
     Serial.print(index);
     Serial.print(F("\t"));
@@ -221,7 +221,7 @@ void readAllAnalog(int* analogPins, int pinCount, long *result){
     result++;
   }
 }
-void resetAll(int pinCount, long *result){
+void resetAll(int pinCount, float *result){
   for (int thisPin = 0; thisPin < pinCount; thisPin++) {
     *result = 0;
     result++;
@@ -229,6 +229,8 @@ void resetAll(int pinCount, long *result){
 }
 void readAllValue(){
   Serial.println(F("Reading all pins value!"));
+  Serial.print(F("Sequence "));
+  Serial.println(valueCount + 1);
   Serial.print(F("Digital pins need to read count "));
   Serial.println(countInDigitalPins);
   readAllDigital(indexInDigitalPins,countInDigitalPins,valueDigitalPins);
@@ -238,7 +240,7 @@ void readAllValue(){
   valueCount++;
   Serial.println(F("Read pins value done."));
 }
-void createJsonMultiple(char* namePins[], int pinCount, long* valuePins, char *httpPackage){
+void createJsonMultiple(char* namePins[], int pinCount, float* valuePins, char *httpPackage){
   Serial.print(F("Name Count "));
   Serial.println(pinCount);
   int index = 0;
@@ -253,10 +255,19 @@ void createJsonMultiple(char* namePins[], int pinCount, long* valuePins, char *h
     strcat(httpPackage,"{\"Name\":\"");
     strcat(httpPackage,namePins[thisPin]);
     strcat(httpPackage,"\",\"Value\":\"");
-    itoa(*valuePins,httpPackage+strlen(httpPackage),10);
+    /*
+     * Cant use sprintf format float
+     * https://forum.arduino.cc/index.php?topic=125946.0
+     */
+    char buf[10];
+    dtostrf(*valuePins,6,2,buf);
+    strcat(httpPackage,buf);
+//    itoa(*valuePins,httpPackage+strlen(httpPackage),10);
     strcat(httpPackage,"\"}");
 
-    Serial.print(F("\t"));
+    Serial.print(F("\tPin "));
+    Serial.print(thisPin);
+    Serial.print(F(": "));
     Serial.print(namePins[thisPin]);
     Serial.print(F(" - "));
     Serial.println(*valuePins);
@@ -264,35 +275,39 @@ void createJsonMultiple(char* namePins[], int pinCount, long* valuePins, char *h
     index++;
   }
 }
-void createJsonComplex(char* namePins[], int pinCount, long* valuePins, char *httpPackage){
+void createJsonComplex(char* namePins[], int pinCount, float* valuePins, char *httpPackage){
   Serial.print(F("Flag Count "));
   Serial.println(pinCount);
   int index = 0;
   int values;
   char names[pinCount] = {};
-  
+
   for (int thisPin = 0; thisPin < pinCount; thisPin++) {
     int length = strlen(namePins[thisPin]);
     if(length == 0){
       continue;
     }
-    char c = namePins[thisPin][0];
-    names[index] = c;
-    values = values + (*valuePins << index);
+    char flagName = namePins[thisPin][0];
+    names[index] = flagName;
+    byte flagValue = byte(*valuePins);
+    byte flagPart = (flagValue << index);
+    values = values + flagPart;
 
-    Serial.print(F("\tFlag "));
-    Serial.print(index);
-    Serial.print(F(" pin "));
+    Serial.print(F("\tPin "));
     Serial.print(thisPin);
-    Serial.print(F(" : "));
-    Serial.print(c);
-    Serial.print(F(" - "));
-    Serial.println(*valuePins);
-    
+    Serial.print(F(": Flag "));
+    Serial.print(index);
+    Serial.print(F("("));
+    Serial.print(flagName);
+    Serial.print(F(") - "));
+    Serial.print(flagValue);
+    Serial.print(F(" << "));
+    Serial.println(flagPart);
+
     valuePins++;
     index++;
   }
-  
+
   strcat(httpPackage,"{\"Name\":\"");
   strcat(httpPackage,names);
   strcat(httpPackage,"\",\"Value\":\"");
@@ -313,7 +328,7 @@ void createBody(char *httpPackage){
   //analog
   createJsonMultiple(nameAnalogPins,ANALOG_COUNT,valueAnalogPins,httpPackage);
   resetAll(ANALOG_COUNT,valueAnalogPins);
-  
+
   //lewei免费用户有传感器数量限制，暂时不上传数字量
   //digital
   strcat(httpPackage,"\n,");
@@ -324,7 +339,7 @@ void createBody(char *httpPackage){
   strcat(httpPackage,"\n,");
   createJsonCount(httpPackage);
   valueCount = 0;
-  
+
   strcat(httpPackage,"\n]");
   Serial.println(F("Create HTTP Body done."));
 }
@@ -333,7 +348,7 @@ void createBody(char *httpPackage){
 void setup(){
   /* Wait for Serial ready */
   delay(5000);
-  
+
   /* Initialise the Serial */
   Serial.begin(115200);
   Serial.println(F("Hello, Wido!\n"));
@@ -362,7 +377,7 @@ void setup(){
   digitalWrite(BLUE_LED, HIGH);
   /* Attempt to connect to an access point */
   char *ssid = WLAN_SSID;             /* Max 32 chars */
-  Serial.print(F("\nAttempting to connect to ")); 
+  Serial.print(F("\nAttempting to connect to "));
   Serial.println(ssid);
 
   /* NOTE: Secure connections are not available in 'Tiny' mode!
@@ -395,7 +410,7 @@ void setup(){
   /* read all pin */
   readAllValue();
   digitalWrite(BLUE_LED, LOW);
-  
+
 }
 
 uint32_t ip = 0;
@@ -403,12 +418,12 @@ uint32_t ip = 0;
 char lengthstr[10] = {};
 
 void loop(){
-  
+
   static Adafruit_CC3000_Client WidoClient;
   static unsigned long RetryMillis = 0;
   static unsigned long uploadtStamp = 0;
   static unsigned long sensortStamp = 0;
-//  static 
+//  static
 
 
 //  Serial.println(F("LOOP..."));
@@ -420,7 +435,7 @@ void loop(){
 
     Serial.println(F("\n\nTry to connect the cloud server"));
     digitalWrite(WHITE_LED, HIGH);
-    
+
     WidoClient.close();
 
     // Get Lewei IP address
@@ -431,17 +446,17 @@ void loop(){
       }
       delay(500);
       digitalWrite(RED_LED, HIGH);
-    }  
+    }
     Wido.printIPdotsRev(ip);
     Serial.println(F(""));
-    
+
     // Connect to the Lewei Server
     WidoClient = Wido.connectTCP(ip, 80);          // Try to connect cloud server
     digitalWrite(RED_LED, LOW);
     digitalWrite(WHITE_LED, LOW);
   }
 
-  
+
   /* check last upload time is expired */
   if(WidoClient.connected() && millis() - uploadtStamp > UPLOAD_TIMEOUT){
     // Update the time stamp
@@ -449,7 +464,7 @@ void loop(){
     // If the device is connected to the cloud server, upload the data every 10s.
     Serial.println(F("\n\nTry to upload the cloud server"));
     digitalWrite(GREEN_LED, HIGH);
-    
+
     // Create Http data package
     char httpPackage[BODY_BUF_LEN] = "";
     int p = &httpPackage;
@@ -465,7 +480,7 @@ void loop(){
 //    Serial.print(&httpPackage);
     Serial.println(F("Body = "));
     Serial.println(httpPackage);
-    
+
     // Prepare Http Package for Lewei & get length
     int length = strlen(httpPackage);                           // get the length of data package
     int p2 = &lengthstr;
@@ -474,32 +489,32 @@ void loop(){
     itoa(length,lengthstr,10);                             // convert int to char array for posting
     Serial.print(F("Length = "));
     Serial.println(length);
-    
+
     Serial.println(F("Connected to Lewei server."));
-    
+
     // Send headers
     Serial.print(F("Sending headers"));
-    
+
     WidoClient.fastrprint(F("POST /api/V1/Gateway/UpdateSensors/"));
     WidoClient.fastrprint(F("01"));                        //Please change your gateway ID
                                                            //The example URL:http://www.lewei50.com/api/V1/gateway/UpdateSensors/01
     WidoClient.fastrprintln(F(" HTTP/1.1"));
     Serial.print(F("."));
-    
+
     WidoClient.fastrprintln(F("Host: open.lewei50.com"));
     Serial.print(F("."));
-    
+
     WidoClient.fastrprint(F("userkey: "));
     WidoClient.fastrprintln(USERKEY);
     Serial.print(F("."));
-    
-    WidoClient.fastrprint("Content-Length: "); 
+
+    WidoClient.fastrprint("Content-Length: ");
     WidoClient.fastrprintln(lengthstr);
     WidoClient.fastrprintln("");
     Serial.print(F("."));
-    
+
     Serial.println(F(" done."));
-    
+
     // Send data
     Serial.println(F("Sending data"));
     for (int thisPin = 0; thisPin < length; thisPin++) {
@@ -510,9 +525,9 @@ void loop(){
 //    WidoClient.fastrprintln(httpPackage);
 
     Serial.println(F(" done."));
-    
+
     /********** Get the http page feedback ***********/
-    
+
     unsigned long rTimer = millis();
     char c = 0;
     Serial.println(F("Reading Cloud Response!!!"));
@@ -540,12 +555,12 @@ void loop(){
       digitalWrite(RED_LED, LOW);
       digitalWrite(GREEN_LED, LOW);
     }
-    
+
 //    delay(1000);             // Wait for 1s to finish posting the data stream
     WidoClient.close();      // Close the service connection
-  
+
     RetryMillis = millis();  // Reset the timer stamp for applying the connection with the service
-  
+
     Serial.println(F("HTTP close."));
   }
 
@@ -560,25 +575,23 @@ void loop(){
   if(millis() - sensortStamp > SENSOR_TIMEOUT){
     // Update the time stamp
     sensortStamp = millis();
-    
+
     Serial.println(F("\n\nTry to update sensor value"));
     digitalWrite(BLUE_LED, HIGH);
 
     /* read all pin */
     readAllValue();
-    
+
     digitalWrite(BLUE_LED, LOW);
     Serial.println(F(""));
-    
+
 //    int reading = analogRead(0);
 //    humidity = reading *0.009765625*100;             //You can use formula in here or change it on the web in modify sensor
-//    Serial.print(F("Real Time Humidity: ")); 
-//    Serial.println(humidity); 
+//    Serial.print(F("Real Time Humidity: "));
+//    Serial.println(humidity);
   }
- 
-  
-  Serial.print(F("."));
-  
+
+
+//  Serial.print(F("."));
+
 }
-
-
